@@ -34,6 +34,89 @@ unique(catch_original$Region)
 ```
 
 # Clean and reshape
+
 ## Remove columns 
+
+```{r}
+#one way to select columns
+catch_data <- catch_original %>% 
+  select(Region, Year, Chinook, Sockeye, Coho, Pink, Chum)
+
+#another way
+catch_data2 <- catch_original %>% 
+  select(-All, -notesRegCode)
+```
+
 ## Check column types
+
+```{r}
+glimpse(catch_data2)
+catch_clean <- catch_data2 %>% 
+  mutate(Chinook = as.numeric(Chinook))
+```
+
+## Check NA
+```{r}
+i <- which(is.na(catch_clean$Chinook))
+# is.na looks for NA  
+# which tells you the position of NA
+
+catch_data[i,] #check the raw data for which row 'i' is in
+```
+
+## Fix Chinook column
+```{r}
+
+catch_clean <- catch_data %>% 
+  mutate(Chinook = if_else(Chinook == "I", #wherever Chinook is I
+                                      "1", # if I, enter 1
+                                      Chinook), # if not, don't do anything
+          Chinook = as.numeric(Chinook)) # 1 was still a character previously, so this ensures numeric 
+catch_clean[i,] #check that row to confirm change
+```
+
 ## Reshape
+From wide to long, use pivot_longer
+```{r}
+catch_long <- catch_clean %>% 
+  pivot_longer(cols = -c(Region, Year),
+               names_to = "species", #quotes used here because these cols do not exist yet
+               values_to = "catch")
+head(catch_long)
+
+catch_wide <- catch_long %>% 
+  pivot_wider(names_from = species,
+              values_from = catch)
+head(catch_wide)
+```
+## Rename
+```{r}
+catch_long <- catch_long %>% 
+  rename(catch_thousands = catch)
+```
+
+## Add a column
+```{r}
+catch_long <- catch_long %>% 
+  mutate(catch = catch_thousands*1000) %>% 
+  select(-catch_thousands)
+```
+
+## Split-Apply- Workflow
+```{r}
+mean_region <- catch_long %>% 
+  group_by(Region) %>% 
+  summarise(catch_mean = mean(catch))
+
+mean_reg_yr <- catch_long %>% 
+  group_by(Region,Year) %>% 
+  summarise(catch_mean = mean(catch))
+
+n_region <- catch_long %>% 
+  group_by(Region) %>% 
+  summarize(obs_n=n()) #counts how many rows/observations of data per region
+
+
+
+```
+
