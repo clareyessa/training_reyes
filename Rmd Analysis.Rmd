@@ -1,0 +1,80 @@
+---
+title: "RMarkdown Analysis"
+author: "Clarissa Reyes"
+date: "2023-04-03"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+```
+
+## Introduction
+Data set contains North Pole Environmental Observatory Bottle Chemistry data.
+Data downloaded on April 3, 2023 at [this link](https://arcticdata.io/catalog/view/doi:10.18739/A25T3FZ8X)
+
+
+### Setup
+readr package is part of tidyverse
+```{r}
+library(readr) #load packages 
+```
+
+### Read data
+reader:: specifies that the function comes from reader package 
+```{r read data, warning=FALSE, message=FALSE}
+bg_chem <- readr::read_csv("data/BGchem2008data.csv") #faster for import, good with deal w factors
+
+```
+
+#### Data exploration
+eval: run or don't run
+echo: show or don't show code in knitted product
+```{r, eval=FALSE, echo=FALSE}
+#names of columns
+colnames(bg_chem)
+
+#data structure
+str(bg_chem)
+
+#summary
+summary(bg_chem)
+
+#view in a tab
+View(bg_chem)
+
+#unique values in a column
+unique(bg_chem$Date)
+```
+
+## Analysis
+
+### Calculate summary stats
+```{r}
+nitrate <- mean(bg_chem$NO3)
+nitrite <- mean(bg_chem$NO2)
+amm <- mean(bg_chem$NH4)
+phos <- mean(bg_chem$P)
+```
+
+### Calc mean redfield ratio
+Redfield ratio = 16:1
+
+```{r}
+ratio <- (nitrate + nitrite + amm)/phos
+```
+
+### Plot
+```{r}
+plot(bg_chem$P, bg_chem$NO3 + bg_chem$NO2 + bg_chem$NH4)
+```
+
+## Conclusion
+
+Can call an object value in-text -- this is good for automatic updating of values, ie.
+
+The redfield ratio is `r round(ratio)`

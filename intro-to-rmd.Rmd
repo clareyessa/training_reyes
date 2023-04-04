@@ -1,0 +1,56 @@
+---
+title: "Intro to Rmd"
+author: "Clarissa Reyes"
+date: "2023-04-03"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+bibliography: references.bib
+reference-section-title: References
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+## Practice
+
+-   superscript^2^
+-   subscript~1~
+
+## Links
+
+[cheatsheet](https://github.com/adam-p/markdown-here/wiki/Markdown-Here-Cheatsheet)
+
+## Citations
+
+[@knipfer2020]
+
+## Table
+
+| Item | Describe | Col3 |
+|------|----------|------|
+| first   | help         |      |
+|      |          |      |
+|      |          |      |
+
+: table description
+
+## Code chunks
+
+```{r}
+heights_ft <- c(5.2, 6.0, 5.7)
+pi <- 3.14
+
+```
+
+## Exercise: new chunk
+
+```{r}
+
+
+
+```
