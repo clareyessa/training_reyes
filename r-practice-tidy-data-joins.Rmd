@@ -12,12 +12,40 @@ library(lubridate)
 ```
 
 ## Import data
-```{r}
+```{r import, warning = FALSE, message = FALSE}
 birds <- read_csv("https://portal.edirepository.org/nis/dataviewer?packageid=knb-lter-cap.256.10&entityid=53edaa7a0e083013d9bf20322db1780e")
 survey <- read_csv("https://portal.edirepository.org/nis/dataviewer?packageid=knb-lter-cap.256.10&entityid=b2466fa5cb5ed7ee1ea91398fc291c59")
 site <- read_csv("https://portal.edirepository.org/nis/dataviewer?packageid=knb-lter-cap.256.10&entityid=81bf72420e69077097fb0790dcdc63a6")
-taxa <- read_csv("https://portal.edirepository.org/nis/dataviewer?packageid=knb-lter-cap.256.10&entityid=81bf72420e69077097fb0790dcdc63a6")
+taxa <- read_csv("https://portal.edirepository.org/nis/dataviewer?packageid=knb-lter-cap.256.10&entityid=58f863b7e3066e68536a9cacdc7bd58e")
 ```
 
+## Explore 
+```{r}
+glimpse(birds)
+glimpse(site)
+glimpse(taxa)
+```
+Primary key: survey_id
+foreign key: site_id
+
+## Subset
+```{r}
+bird_subset <- birds %>% 
+  filter(species_id %in% c("BHCO","RWBL")) %>% 
+  filter(site_id %in% c("LI-W","NU-C"))          
+```
+
+## Join
+
+```{r}
+names(bird_subset)
+names(site)
+
+bird_site_left <- left_join(bird_subset,site)
+
+bird_left <- bird_subset %>%
+  left_join(site, "site_id")
+
+bird_site_full <- full_join(bird_subset,site) 
 ```
 
