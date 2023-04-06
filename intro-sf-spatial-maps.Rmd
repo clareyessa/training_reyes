@@ -1,0 +1,184 @@
+---
+title: "Intro to sf"
+author: "Clarissa Reyes"
+date: "2023-04-06"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Load libraries
+```{r, message=FALSE}
+library(sf)
+library(ggplot2)
+library(leaflet)
+library(scales)
+library(ggmap) #used to add base maps to static maps 
+library(dplyr)
+library(readr)
+
+```
+
+# Load and explore AK Regions data
+```{r}
+ak_regions <- read_sf("data/ak_regions_simp.shp")
+
+plot(ak_regions)
+class(ak_regions) #classes incl sf AND dataframe
+glimpse(ak_regions)
+```
+
+# Transform CRS of `ak_regions`
+```{r}
+st_crs(ak_regions) #geocrs is unprojected, not meant to be plotted on a map
+
+ak_regions_3338 <- ak_regions %>% 
+  st_transform(crs = 3338) #tell which EPSG code you want to do
+
+st_crs(ak_regions_3338) #now in projected crs
+plot(ak_regions_3338)
+
+```
+# Notes
+crs (coord ref system)
+unprojected: geographic coordinate system (gcs)
+- defines where something is positioned on the globe #D sphere, angular - typically degrees
+
+projected: has lat/long, represented as 2D- typically in linear unit, ie meters
+
+every map of the earth is distorted in some way
+EPSG codes for different projections
+prj file gives details about the projection you've started
+
+4236 is commonly used because it has coordinates for the whole world
+3857 used in google, arcGIS, etc
+
+# sf and tidyverse
+```{r}
+colnames(ak_regions_3338)
+
+ak_regions_3338 %>% 
+  select(region) %>%  #choose what you want to keep; geometry will remain ("sticky") bc the data itself is .shp
+  filter(region == "Yukon")
+```
+
+# spatial joins
+```{r}
+pop <- read_csv("data/alaska_population.csv")
+
+#explore data
+View(pop) #is in EPSG 3338 
+class(pop) #no sf class - no geometry col
+
+
+pop_4326 <- st_as_sf(pop, #changes to spatial projection
+                     coords = c("lng","lat"),
+                     crs = 4236,
+                     remove = FALSE) #do not remov long and lat, but can bc because geometry col now exists
+class(pop_4326) #now has sf class
+
+pop_joined <- st_join(pop_4326, ak_regions_3338, join = st_within) #wanting to know pops within those regions
+#can't join because crs of both datasets don't match
+
+pop_3338 <- st_transform(pop_4326, crs= 3338) #changed from 4326 to 3338
+st_crs(pop_3338) # can check projections
+
+pop_joined <- st_join(pop_3338, ak_regions_3338, join = st_within) 
+glimpse(pop_joined)
+```
+
+# Wrangling
+```{r}
+pop_region <- pop_joined %>% 
+  as.data.frame() %>%  # want df in order to use tidyverse functions
+  group_by(region) %>% 
+  summarise(total_pop = sum(population))
+head(pop_region)
+
+class(pop_region) #still shows df, but need it to be spatial for mapping
+
+pop_region_3338 <- left_join(ak_regions_3338, pop_region, by = "region")
+```
+# Plot
+```{r}
+plot(pop_region_3338["total_pop"]) #square brackets allow you to index: access diff values/variables within df
+
+```
+
+# New plot by mgmt
+```{r}
+pop_mgmt_3338 <- pop_region_3338 %>% 
+  group_by(mgmt_area) %>% 
+  summarise(total_pop = sum(total_pop))
+
+plot(pop_mgmt_3338["total_pop"]) # lost some of the AK regions
+
+pop_mgmt_3338 <- pop_region_3338 %>% 
+  group_by(mgmt_area) %>% 
+  summarise(total_pop = sum(total_pop), do_union = FALSE) #don't want to lose the geometries 
+View(pop_mgmt_3338)
+
+write_sf(pop_region_3338, "data/ak_regions_population.shp") #save
+```
+# Visualize with ggplot
+```{r}
+ggplot(pop_region_3338) +
+    geom_sf(aes(fill = total_pop))+ 
+    labs(fill = "Total Population")+ 
+    scale_fill_viridis_c(labels = comma)+ #colorblind 
+    theme_bw()
+```
+
+# Rivers spatial data
+```{r}
+rivers_3338 <- read_sf("data/ak_rivers_simp.shp")
+st_crs(rivers_3338) #see crs - using same projection as ak_pop
+
+ggplot()+
+  #image layers
+  geom_sf(pop_region_3338, mapping = aes(fill = log10(total_pop)))+ #one data obj here in geom_sf layer
+  geom_sf(pop_3338, mapping = aes(), color = "red4", size = 0.5)+ #another data obj #keep aes blank bc using other mappting aes #color has nothing to do with data so should be outside of aes()
+  geom_sf(rivers_3338, mapping = aes(linewidth = StrOrder))+ 
+    scale_linewidth(range = c(0.05,0.5), #changes scale of line widths
+                    guide = "none")+ #removes stream order legend 
+  #customization
+  scale_fill_viridis_c(labels = comma)+ #defines legend numbers to take away from scientific notation
+  labs(fill = "Total Population",
+       title = "Alaska populations")+ #fill corresponds to total_pop variable 
+  theme(
+    plot.title = element_text(hjust = 0.5)
+    )
+```   
+# Visualize `sf` objs with `leaflet`
+You have to provide projection AND unprojected
+
+ggplot uses + (to layer, so next level overrides)
+leaflet uses pipes ("and then")
+leafletCRS allows us to create a custom crs
+
+
+```{r}
+
+epsg3338 <- leaflet::leafletCRS( #custom crs to create projected
+    crsClass = "L.Proj.CRS",
+    code = "EPSG:3338",
+    proj4def =  "+proj=aea +lat_1=55 +lat_2=65 +lat_0=50 +lon_0=-154 +x_0=0 +y_0=0 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs", #proj4 definition required from EPSG
+    resolutions = 2 ^ (16:7)
+)
+
+pop_region_4326 <- pop_region_3338 %>%  #unprojected
+  st_transform(crs=4326) 
+
+m <- leaflet(options = leafletOptions(crs = epsg3338)) %>% 
+  addPolygons(data = pop_region_4326,
+              fillColor = "green",
+              weight = 1,
+              fillOpacity = 2) #line thickness 
+m
+```   
+
+
+
+
