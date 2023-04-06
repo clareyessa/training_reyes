@@ -1,0 +1,86 @@
+---
+title: 'R Practice: Spatial Data and Making Maps'
+author: "Clarissa Reyes"
+date: "2023-04-06"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(readr)
+library(dplyr)
+library(sf)
+library(ggplot2)
+library(scales)
+library(leaflet)
+library(ggmap)
+```
+
+```{r}
+pika <- read_csv("data/pika_fecal_glut.aw.data.csv")
+elevation <- read_csv("data/pika_fecal_glut_habitat.aw.data.csv")
+
+glimpse(pika)
+glimpse(elevation)
+```
+
+# Wrangle data
+```{r}
+pika_clean <- pika %>% 
+  select(Date, Station, UTM_Easting, UTM_Northing, Concentration_pg_g, Site, Sex) %>% 
+  mutate(across(c(Station, Site, Sex),as.factor)) %>%  #across can apply function to multiple cols
+  mutate(Site = case_match(Site, "CG" ~ "Cable Gate", "WK" ~ "West Knoll", "LL" ~ "Long Lake")) %>% #change observation names within col 
+  relocate(Site, .before = Station) %>% # move cols 
+  relocate(Sex, .after = UTM_Northing)
+
+elevation_clean <- elevation %>% 
+  select(Station, Elev_M) %>% 
+  mutate(Station = as.factor(Station))
+
+pikas <- full_join(pika_clean, elevation_clean, by = "Station")
+```
+
+# Converting to sf (simple features)
+```{r}
+pikas_sf <- st_as_sf(pikas,
+                     coords = c("UTM_Easting","UTM_Northing"),
+                     crs = 26913,
+                     remove = F)
+class(pikas_sf)
+```
+## ggplot
+```{r}
+pika_map <- ggplot(pikas_sf)+
+            geom_sf()
+pika_map
+
+pika_fancy <- ggplot(pikas_sf)+
+            geom_sf(aes(color = Site, shape = Site), size = 1)+ # 5=diamond
+  #labels
+  labs(title = "Pikas in Niwot Ridge, 2018-2019",
+       xlab = "Latitude",
+       ylab = "Longitude")+
+  theme(
+    #legend.position="bottom",
+    plot.title = element_text(hjust = 0.5))
+pika_fancy
+```
+# Adding a base map
+```{r}
+pikas_sf_4326 <- pikas_sf %>%  #unprojected
+  st_transform(crs=4326) 
+
+nwt_bbox <- c(left = -105.65, bottom = 40.04, right = -105.55, top = 40.1) #creating bounding box w coordinates 
+
+nwt_basemap <- get_stamenmap(nwt_bbox, zoom=13, maptype = "terrain")
+
+ggmap(nwt_basemap)+
+  geom_sf(pikas_sf_4326, 
+          mapping = aes(color = Site, shape = Site),
+          inherit.aes = FALSE)
+
+```
+
+
+
